@@ -7,7 +7,8 @@ import streamlit as st
 from scanner.universe import load_universe
 from scanner.engine import scan_market
 
-LOCK_FILE = "locked_top3.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCK_FILE = os.path.join(BASE_DIR, "locked_top3.csv")
 LOCK_TIME = time(9, 45)
 
 st.set_page_config(
@@ -18,22 +19,38 @@ st.set_page_config(
 st.title("SMART F&O ENGINE V6 - LOCKED TOP 3")
 
 
+def today_date():
+    return datetime.now().date()
+
+
 def today_str():
-    return datetime.now().strftime("%Y-%m-%d")
+    return datetime.now().strftime("%d-%m-%Y")
 
 
 def load_locked_top3():
     if not os.path.exists(LOCK_FILE):
         return None
 
-    df = pd.read_csv(LOCK_FILE)
+    try:
+        df = pd.read_csv(LOCK_FILE)
+        if df.empty or "date" not in df.columns:
+            return None
 
-    today_df = df[df["date"] == today_str()]
+        parsed_dates = pd.to_datetime(
+            df["date"].astype(str).str.strip(),
+            dayfirst=True,
+            errors="coerce"
+        ).dt.date
 
-    if today_df.empty:
+        today_df = df[parsed_dates == today_date()].copy()
+
+        if today_df.empty:
+            return None
+
+        return today_df.drop(columns=["date"], errors="ignore")
+
+    except Exception:
         return None
-
-    return today_df.drop(columns=["date"])
 
 
 def save_locked_top3(results):
@@ -64,25 +81,42 @@ if locked_df is not None:
     df = locked_df.copy()
 
 else:
-    results = cached_scan()
+    now = datetime.now().time()
 
-    if len(results) == 0:
-        st.warning("No high-quality trade setup found right now.")
-        st.stop()
+    if now >= LOCK_TIME:
+        results = cached_scan()
 
-    df = pd.DataFrame(results)
+        if len(results) == 0:
+            st.warning("No high-quality trade setup found right now.")
+            st.stop()
 
-    if datetime.now().time() >= LOCK_TIME:
         save_locked_top3(results)
-        st.success("Top 3 locked now for today.")
+
+        locked_df = load_locked_top3()
+
+        if locked_df is not None:
+            df = locked_df.copy()
+            st.success("Top 3 locked now for today.")
+        else:
+            df = pd.DataFrame(results)
+            st.warning("Top 3 could not be locked, showing current scan only.")
     else:
+        results = cached_scan()
+
+        if len(results) == 0:
+            st.warning("No high-quality trade setup found right now.")
+            st.stop()
+
+        df = pd.DataFrame(results)
         st.warning("Observation mode. Top 3 will lock after 09:45 AM.")
 
+
+if "Rank" in df.columns:
+    df = df.drop(columns=["Rank"])
 
 df.insert(0, "Rank", range(1, len(df) + 1))
 
 st.subheader("TOP 3 TRADES")
-
 st.dataframe(df, use_container_width=True)
 
 st.info(
