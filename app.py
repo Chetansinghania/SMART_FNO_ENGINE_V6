@@ -18,6 +18,8 @@ st.set_page_config(
 
 st.title("SMART F&O ENGINE V6 - LOCKED TOP 3")
 
+st.caption("VERSION : V6.1 BUILD 2026-07-08")
+st.write("Server Time:", datetime.now())
 
 def today_date():
     return datetime.now().date()
