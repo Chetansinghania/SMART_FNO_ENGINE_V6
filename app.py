@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, time
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -7,8 +8,15 @@ import streamlit as st
 from scanner.universe import load_universe
 from scanner.engine import scan_market
 
+# ==========================
+# CONFIGURATION
+# ==========================
+
+IST = ZoneInfo("Asia/Kolkata")
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCK_FILE = os.path.join(BASE_DIR, "locked_top3.csv")
+
 LOCK_TIME = time(9, 45)
 
 st.set_page_config(
@@ -17,111 +25,161 @@ st.set_page_config(
 )
 
 st.title("SMART F&O ENGINE V6 - LOCKED TOP 3")
+st.caption("VERSION : V6.2 STABLE")
+st.write("Indian Time :", datetime.now(IST).strftime("%d-%m-%Y %H:%M:%S"))
 
-st.caption("VERSION : V6.1 BUILD 2026-07-08")
-st.write("Server Time:", datetime.now())
+# ==========================
+# DATE FUNCTIONS
+# ==========================
 
 def today_date():
-    return datetime.now().date()
+    return datetime.now(IST).date()
 
 
 def today_str():
-    return datetime.now().strftime("%d-%m-%Y")
+    return datetime.now(IST).strftime("%d-%m-%Y")
 
+
+# ==========================
+# LOAD LOCK FILE
+# ==========================
 
 def load_locked_top3():
+
     if not os.path.exists(LOCK_FILE):
         return None
 
     try:
+
         df = pd.read_csv(LOCK_FILE)
-        if df.empty or "date" not in df.columns:
+
+        if df.empty:
             return None
 
-        parsed_dates = pd.to_datetime(
-            df["date"].astype(str).str.strip(),
-            dayfirst=True,
+        if "date" not in df.columns:
+            return None
+
+        df["date"] = pd.to_datetime(
+            df["date"],
+            format="%d-%m-%Y",
             errors="coerce"
         ).dt.date
 
-        today_df = df[parsed_dates == today_date()].copy()
+        today_df = df[df["date"] == today_date()].copy()
 
         if today_df.empty:
             return None
 
-        return today_df.drop(columns=["date"], errors="ignore")
+        today_df.drop(columns=["date"], inplace=True)
 
-    except Exception:
+        return today_df
+
+    except Exception as e:
+
+        st.error(f"Lock file error : {e}")
+
         return None
 
 
+# ==========================
+# SAVE LOCK FILE
+# ==========================
+
 def save_locked_top3(results):
+
     df = pd.DataFrame(results)
 
     if df.empty:
         return
 
     df.insert(0, "date", today_str())
+
     df.to_csv(LOCK_FILE, index=False)
 
 
+# ==========================
+# SCANNER
+# ==========================
+
 @st.cache_data(ttl=300)
 def cached_scan():
+
     stocks = load_universe()
+
     return scan_market(stocks)
 
 
+# ==========================
+# REFRESH
+# ==========================
+
 if st.button("Refresh Scanner"):
+
     st.cache_data.clear()
+
     st.rerun()
 
+
+# ==========================
+# MAIN LOGIC
+# ==========================
 
 locked_df = load_locked_top3()
 
 if locked_df is not None:
-    st.success("Top 3 locked for today. Refresh will not replace stocks.")
+
     df = locked_df.copy()
 
+    st.success("Today's Top 3 already locked.")
+
 else:
-    now = datetime.now().time()
+
+    results = cached_scan()
+
+    if len(results) == 0:
+
+        st.warning("No high quality setup found.")
+
+        st.stop()
+
+    now = datetime.now(IST).time()
 
     if now >= LOCK_TIME:
-        results = cached_scan()
-
-        if len(results) == 0:
-            st.warning("No high-quality trade setup found right now.")
-            st.stop()
 
         save_locked_top3(results)
 
-        locked_df = load_locked_top3()
+        df = pd.DataFrame(results)
 
-        if locked_df is not None:
-            df = locked_df.copy()
-            st.success("Top 3 locked now for today.")
-        else:
-            df = pd.DataFrame(results)
-            st.warning("Top 3 could not be locked, showing current scan only.")
+        st.success("Today's Top 3 locked successfully.")
+
     else:
-        results = cached_scan()
-
-        if len(results) == 0:
-            st.warning("No high-quality trade setup found right now.")
-            st.stop()
 
         df = pd.DataFrame(results)
-        st.warning("Observation mode. Top 3 will lock after 09:45 AM.")
 
+        st.warning("Observation Mode (Before 09:45 AM)")
+
+
+# ==========================
+# DISPLAY
+# ==========================
+
+if "_score" in df.columns:
+    df.drop(columns=["_score"], inplace=True)
 
 if "Rank" in df.columns:
-    df = df.drop(columns=["Rank"])
+    df.drop(columns=["Rank"], inplace=True)
 
-df.insert(0, "Rank", range(1, len(df) + 1))
+df.insert(0, "Rank", range(1, len(df)+1))
 
 st.subheader("TOP 3 TRADES")
+
 st.dataframe(df, use_container_width=True)
 
 st.info(
-    "Before 09:45 AM: Observation mode, list may change. "
-    "After 09:45 AM: Top 3 stocks are locked for the day."
+    """
+After 09:45 AM (IST), the Top 3 trades are locked for the trading day.
+
+The scanner will continue refreshing market data,
+but today's locked trades remain unchanged.
+"""
 )
