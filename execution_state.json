@@ -1,0 +1,49 @@
+{
+  "date": "2026-07-19",
+  "stocks": {
+    "SHREECEM.NS": {
+      "Stock": "SHREECEM.NS",
+      "Action": "SELL",
+      "Status": "READY",
+      "Entry": null,
+      "SL": null,
+      "Target 1": null,
+      "Target 2": null,
+      "Risk": null,
+      "Risk %": null,
+      "Live Price": 26515.0,
+      "Trigger Price": 26426.74,
+      "Points to Trigger": 88.26,
+      "Trigger Distance %": 0.334,
+      "Progress %": null,
+      "Reason": "Setup confirmed; waiting for breakout trigger.",
+      "Triggered At": null,
+      "Target 1 Hit At": null,
+      "Target 2 Hit At": null,
+      "Stop Loss Hit At": null,
+      "Last Updated": "2026-07-19 12:01:21"
+    },
+    "TRENT.NS": {
+      "Stock": "TRENT.NS",
+      "Action": "SELL",
+      "Status": "READY",
+      "Entry": null,
+      "SL": null,
+      "Target 1": null,
+      "Target 2": null,
+      "Risk": null,
+      "Risk %": null,
+      "Live Price": 2842.4,
+      "Trigger Price": 2837.78,
+      "Points to Trigger": 4.62,
+      "Trigger Distance %": 0.163,
+      "Progress %": null,
+      "Reason": "Setup confirmed; waiting for breakout trigger.",
+      "Triggered At": null,
+      "Target 1 Hit At": null,
+      "Target 2 Hit At": null,
+      "Stop Loss Hit At": null,
+      "Last Updated": "2026-07-19 12:01:22"
+    }
+  }
+}
