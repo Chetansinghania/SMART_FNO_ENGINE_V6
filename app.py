@@ -39,14 +39,23 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("SMART F&O ENGINE V8 - LOCKED TOP 2")
-st.caption("VERSION: V8.0 PERSISTENT TRIGGER ENGINE")
+# ==========================
+# HEADER
+# ==========================
 
-st.write(
-    "Indian Time:",
-    datetime.now(IST).strftime(
-        "%d-%m-%Y %H:%M:%S"
-    ),
+header_left, header_right = st.columns([6, 1])
+
+with header_left:
+    st.title("SMART F&O ENGINE")
+
+with header_right:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🔄 Refresh"):
+        st.cache_data.clear()
+        st.rerun()
+
+st.caption(
+    f"Indian Time: {datetime.now(IST).strftime('%d-%m-%Y %H:%M:%S')}  |  Auto Refresh: 30 Seconds"
 )
 
 components.html(
@@ -59,7 +68,6 @@ components.html(
     """,
     height=0,
 )
-st.caption("Auto-refresh enabled: every 30 seconds")
 
 
 # ==========================
@@ -247,13 +255,6 @@ def cached_scan():
     return scan_market(stocks)
 
 
-# ==========================
-# MANUAL REFRESH
-# ==========================
-
-if st.button("Refresh Scanner and Monitor"):
-    st.cache_data.clear()
-    st.rerun()
 
 
 # ==========================
@@ -266,9 +267,6 @@ is_locked = locked_dataframe is not None
 if is_locked:
     watchlist_dataframe = locked_dataframe.copy()
 
-    st.success(
-        "Today's Top 2 watchlist is already locked."
-    )
 
 else:
     results = cached_scan()
@@ -420,7 +418,7 @@ available_watchlist_columns = [
     if column in display_dataframe.columns
 ]
 
-st.subheader("TODAY'S LOCKED WATCHLIST")
+st.subheader("📈 TODAY'S LOCKED WATCHLIST")
 
 st.dataframe(
     display_dataframe[
@@ -473,7 +471,7 @@ if not trade_dataframe.empty:
         if column in trade_dataframe.columns
     ]
 
-    st.subheader("TRADE LIFECYCLE")
+    st.subheader("📊 TRADE LIFECYCLE")
 
     st.dataframe(
         trade_dataframe[
@@ -488,20 +486,3 @@ else:
         "targets will appear only after a valid breakout."
     )
 
-
-st.info(
-    """
-One-month backtest mode is active.
-
-Score, ROLV, trigger distance and execution reasons are calculated
-internally but hidden from the dashboard.
-
-Every refresh records the practical trade data in backtest_results.csv.
-Do not change the strategy settings during the testing period.
-"""
-)
-
-st.caption(
-    "Market data from free sources may be delayed. "
-    "Use this system for backtesting and paper-trading evaluation."
-)
