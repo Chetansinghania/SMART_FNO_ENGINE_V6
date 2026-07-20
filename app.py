@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from scanner.engine import scan_market
 from scanner.execution import monitor_watchlist
@@ -34,12 +35,12 @@ LOCK_TIME = time(9, 45)
 
 
 st.set_page_config(
-    page_title="SMART F&O ENGINE V7",
+    page_title="SMART F&O ENGINE V8",
     layout="wide",
 )
 
-st.title("SMART F&O ENGINE V7 - LOCKED TOP 2")
-st.caption("VERSION: V7.5 ONE-MONTH BACKTEST MODE")
+st.title("SMART F&O ENGINE V8 - LOCKED TOP 2")
+st.caption("VERSION: V8.0 PERSISTENT TRIGGER ENGINE")
 
 st.write(
     "Indian Time:",
@@ -47,6 +48,18 @@ st.write(
         "%d-%m-%Y %H:%M:%S"
     ),
 )
+
+components.html(
+    """
+    <script>
+        setTimeout(function () {
+            window.parent.location.reload();
+        }, 30000);
+    </script>
+    """,
+    height=0,
+)
+st.caption("Auto-refresh enabled: every 30 seconds")
 
 
 # ==========================

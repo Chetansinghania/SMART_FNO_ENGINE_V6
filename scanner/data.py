@@ -403,6 +403,24 @@ def prepare_features(symbol: str) -> Optional[dict]:
         "today_high": session_high,
         "today_low": session_low,
 
+        # Full completed-candle history for the latest session.
+        # execution.py uses this to reconstruct missed triggers after
+        # refreshes, restarts or temporary data outages.
+        "session_candles": [
+            {
+                "time": (
+                    pd.Timestamp(index).tz_localize(IST)
+                    if pd.Timestamp(index).tzinfo is None
+                    else pd.Timestamp(index).tz_convert(IST)
+                ).strftime("%Y-%m-%d %H:%M:%S"),
+                "open": round(float(row["Open"]), 2),
+                "high": round(float(row["High"]), 2),
+                "low": round(float(row["Low"]), 2),
+                "close": round(float(row["Close"]), 2),
+            }
+            for index, row in session_data.iterrows()
+        ],
+
         # V6 compatibility fields.
         "cmp": round(live_price, 2),
         "latest_high": completed_high,
