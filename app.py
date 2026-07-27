@@ -46,7 +46,7 @@ st.set_page_config(
 header_left, header_right = st.columns([6, 1])
 
 with header_left:
-    st.title("SMART F&O ENGINE")
+    st.title("SMART F&O ENGINE V8.1")
 
 with header_right:
     st.markdown("<br>", unsafe_allow_html=True)
@@ -55,7 +55,9 @@ with header_right:
         st.rerun()
 
 st.caption(
-    f"Indian Time: {datetime.now(IST).strftime('%d-%m-%Y %H:%M:%S')}  |  Auto Refresh: 30 Seconds"
+    f"Build: V8.1-CPR | Indian Time: "
+    f"{datetime.now(IST).strftime('%d-%m-%Y %H:%M:%S')} | "
+    "Auto Refresh: 30 Seconds"
 )
 
 components.html(
@@ -485,4 +487,3 @@ else:
         "No trade has triggered yet. Entry, stop-loss and "
         "targets will appear only after a valid breakout."
     )
-
