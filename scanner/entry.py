@@ -56,6 +56,9 @@ def _required_values(
         "ema50": features.get("ema50"),
         "vwap": features.get("vwap"),
         "rolv": features.get("rolv"),
+        "cpr_pivot": features.get("cpr_pivot"),
+        "cpr_bottom": features.get("cpr_bottom"),
+        "cpr_top": features.get("cpr_top"),
     }
 
     values: dict[str, float] = {}
@@ -97,6 +100,8 @@ def validate_direction(
     ema20 = values["ema20"]
     ema50 = values["ema50"]
     vwap = values["vwap"]
+    cpr_bottom = values["cpr_bottom"]
+    cpr_top = values["cpr_top"]
 
     if action == "BUY":
 
@@ -104,12 +109,14 @@ def validate_direction(
             close > ema20
             and ema20 > ema50
             and close > vwap
+            and close > cpr_top
         )
 
     return (
         close < ema20
         and ema20 < ema50
         and close < vwap
+        and close < cpr_bottom
     )
 
 
@@ -274,7 +281,7 @@ def evaluate_entry(
         result["Status"] = "WAITING"
 
         result["Reason"] = (
-            "Waiting for EMA20, EMA50 and VWAP "
+            "Waiting for EMA20, EMA50, VWAP and CPR "
             "confirmation on a completed 15-minute candle."
         )
 

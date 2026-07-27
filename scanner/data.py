@@ -222,6 +222,59 @@ def _get_latest_session_data(
     return latest_session_data, latest_session_date
 
 
+def calculate_previous_session_cpr(
+    completed_data: pd.DataFrame,
+    current_session_date: object,
+) -> Optional[dict[str, float]]:
+    """Calculate today's CPR from the previous completed session."""
+
+    if completed_data is None or completed_data.empty:
+        return None
+
+    session_dates = _index_in_ist(completed_data).date
+    earlier_dates = sorted(
+        {date_value for date_value in session_dates if date_value < current_session_date}
+    )
+
+    if not earlier_dates:
+        return None
+
+    previous_session_date = earlier_dates[-1]
+    previous_session = completed_data.loc[
+        session_dates == previous_session_date
+    ]
+
+    if previous_session.empty:
+        return None
+
+    try:
+        previous_high = float(previous_session["High"].max())
+        previous_low = float(previous_session["Low"].min())
+        previous_close = float(previous_session["Close"].iloc[-1])
+    except (ValueError, TypeError, IndexError, KeyError):
+        return None
+
+    pivot = (previous_high + previous_low + previous_close) / 3.0
+    raw_bc = (previous_high + previous_low) / 2.0
+    raw_tc = (2.0 * pivot) - raw_bc
+
+    cpr_bottom = min(raw_bc, raw_tc)
+    cpr_top = max(raw_bc, raw_tc)
+    width_pct = (
+        ((cpr_top - cpr_bottom) / pivot) * 100.0
+        if pivot > 0
+        else 0.0
+    )
+
+    return {
+        "cpr_pivot": pivot,
+        "cpr_bottom": cpr_bottom,
+        "cpr_top": cpr_top,
+        "cpr_width_pct": width_pct,
+        "cpr_source_date": previous_session_date,
+    }
+
+
 def prepare_features(symbol: str) -> Optional[dict]:
     """
     Prepare scanner features using completed 15-minute candles.
@@ -317,6 +370,14 @@ def prepare_features(symbol: str) -> Optional[dict]:
     if session_data.empty:
         return None
 
+    cpr = calculate_previous_session_cpr(
+        completed_data=completed_data,
+        current_session_date=session_date,
+    )
+
+    if cpr is None:
+        return None
+
     completed = completed_data.iloc[-1]
     previous = completed_data.iloc[-2]
 
@@ -358,6 +419,10 @@ def prepare_features(symbol: str) -> Optional[dict]:
             rolv,
             session_high,
             session_low,
+            cpr["cpr_pivot"],
+            cpr["cpr_bottom"],
+            cpr["cpr_top"],
+            cpr["cpr_width_pct"],
         ]
     ):
         return None
@@ -398,6 +463,14 @@ def prepare_features(symbol: str) -> Optional[dict]:
         "vwap": vwap,
         "atr": atr,
         "rolv": rolv,
+
+        # Central Pivot Range calculated from the previous session.
+        # These fields are used internally and are not displayed.
+        "cpr_pivot": cpr["cpr_pivot"],
+        "cpr_bottom": cpr["cpr_bottom"],
+        "cpr_top": cpr["cpr_top"],
+        "cpr_width_pct": cpr["cpr_width_pct"],
+        "cpr_source_date": cpr["cpr_source_date"],
 
         # Latest trading-session range.
         "today_high": session_high,

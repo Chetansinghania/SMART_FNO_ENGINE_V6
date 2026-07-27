@@ -35,7 +35,7 @@ def _to_float(value: Any) -> Optional[float]:
 
 
 def _default_state() -> dict:
-    return {"date": _today_str(), "version": "V8.0", "stocks": {}}
+    return {"date": _today_str(), "version": "V8.1", "stocks": {}}
 
 
 def load_execution_state() -> dict:
@@ -50,7 +50,7 @@ def load_execution_state() -> dict:
         return _default_state()
     if not isinstance(state.get("stocks"), dict):
         state["stocks"] = {}
-    state["version"] = "V8.0"
+    state["version"] = "V8.1"
     return state
 
 
@@ -153,11 +153,30 @@ def _progress(action: str, price: Any, entry: Any, target_2: Any) -> Optional[fl
     return round(max(-100.0, min((achieved / total) * 100, 100.0)), 1)
 
 
-def _find_trigger(action: str, trigger: float, candles: list[dict]) -> Optional[dict]:
+def _find_trigger(
+    action: str,
+    trigger: float,
+    candles: list[dict],
+    cpr_bottom: float,
+    cpr_top: float,
+) -> Optional[dict]:
+    """Find the first breakout candle that also confirms CPR direction."""
+
     for candle in candles:
-        crossed = candle["high"] >= trigger if action == "BUY" else candle["low"] <= trigger
+        if action == "BUY":
+            crossed = (
+                candle["high"] >= trigger
+                and candle["close"] > cpr_top
+            )
+        else:
+            crossed = (
+                candle["low"] <= trigger
+                and candle["close"] < cpr_bottom
+            )
+
         if crossed:
             return candle
+
     return None
 
 
@@ -230,15 +249,43 @@ def evaluate_locked_stock(stock: str, action: str, previous_state: Optional[dict
         state["Last Updated"] = _now_str()
         return state
 
-    trigger_candle = _find_trigger(action, trigger, candles)
-    live_crossed = (action == "BUY" and live_price >= trigger) or (action == "SELL" and live_price <= trigger)
+    cpr_bottom = _to_float(features.get("cpr_bottom"))
+    cpr_top = _to_float(features.get("cpr_top"))
+
+    if cpr_bottom is None or cpr_top is None:
+        state.update({
+            "Reason": "CPR data unavailable; prior state preserved.",
+            "Last Updated": _now_str(),
+        })
+        return state
+
+    trigger_candle = _find_trigger(
+        action=action,
+        trigger=trigger,
+        candles=candles,
+        cpr_bottom=cpr_bottom,
+        cpr_top=cpr_top,
+    )
+
+    direction_valid = validate_direction(
+        action=action,
+        features=features,
+    )
+
+    live_crossed = (
+        direction_valid
+        and (
+            (action == "BUY" and live_price >= trigger)
+            or (action == "SELL" and live_price <= trigger)
+        )
+    )
 
     if trigger_candle is None and not live_crossed and not state.get("Triggered At"):
         rolv = _to_float(features.get("rolv"))
-        if validate_direction(action=action, features=features) and rolv is not None and rolv >= MIN_ROLV:
+        if direction_valid and rolv is not None and rolv >= MIN_ROLV:
             state.update({"Status": "READY", "Reason": "Setup valid; waiting for trigger."})
         else:
-            state.update({"Status": "WAITING", "Reason": "Waiting for trend and volume confirmation."})
+            state.update({"Status": "WAITING", "Reason": "Waiting for trend, volume and CPR confirmation."})
         state["Progress %"] = None
         state["Last Updated"] = _now_str()
         return state

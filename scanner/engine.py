@@ -52,6 +52,8 @@ def _extract_scoring_values(
             "previous_close",
             features.get("prev_close"),
         ),
+        "cpr_bottom": features.get("cpr_bottom"),
+        "cpr_top": features.get("cpr_top"),
     }
 
     values: dict[str, float] = {}
@@ -92,6 +94,8 @@ def score_stock(features: dict) -> Optional[dict]:
     today_low = values["today_low"]
     latest_close = values["latest_close"]
     prev_close = values["prev_close"]
+    cpr_bottom = values["cpr_bottom"]
+    cpr_top = values["cpr_top"]
 
     buy_score = 0
     sell_score = 0
@@ -145,6 +149,14 @@ def score_stock(features: dict) -> Optional[dict]:
         action = "SELL"
         final_score = sell_score
         opposite_score = buy_score
+
+    # Internal CPR directional filter. A BUY candidate must trade above
+    # the previous session's CPR, while a SELL candidate must trade below it.
+    if action == "BUY" and latest_close <= cpr_top:
+        return None
+
+    if action == "SELL" and latest_close >= cpr_bottom:
+        return None
 
     return {
         "Action": action,
