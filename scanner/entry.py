@@ -78,46 +78,35 @@ def _required_values(
     return values
 
 
-def validate_direction(
-    action: str,
-    features: dict,
-) -> bool:
-    """
-    Confirm whether the completed candle supports the selected direction.
-    """
-
+def validate_direction(action: str, features: dict) -> bool:
+    """Confirm trend, CPR, volume and signal-candle quality."""
     action = str(action).upper().strip()
-
     values = _required_values(features)
-
-    if action not in VALID_ACTIONS:
+    if action not in VALID_ACTIONS or values is None:
         return False
 
-    if values is None:
+    open_price = _to_float(features.get("completed_open"))
+    ema20_slope = _to_float(features.get("ema20_slope"))
+    if open_price is None or ema20_slope is None:
         return False
 
+    high, low = values["completed_high"], values["completed_low"]
     close = values["completed_close"]
-    ema20 = values["ema20"]
-    ema50 = values["ema50"]
-    vwap = values["vwap"]
-    cpr_bottom = values["cpr_bottom"]
-    cpr_top = values["cpr_top"]
+    candle_range = high - low
+    body = abs(close - open_price)
+    if candle_range <= 0 or body / candle_range < 0.50 or values["rolv"] < DEFAULT_MIN_ROLV:
+        return False
 
     if action == "BUY":
+        close_quality = (close - low) / candle_range >= 0.75
+        return (close_quality and close > values["ema20"] > values["ema50"]
+                and ema20_slope > 0 and close > values["vwap"]
+                and close > values["cpr_top"] and close > values["previous_close"])
 
-        return (
-            close > ema20
-            and ema20 > ema50
-            and close > vwap
-            and close > cpr_top
-        )
-
-    return (
-        close < ema20
-        and ema20 < ema50
-        and close < vwap
-        and close < cpr_bottom
-    )
+    close_quality = (high - close) / candle_range >= 0.75
+    return (close_quality and close < values["ema20"] < values["ema50"]
+            and ema20_slope < 0 and close < values["vwap"]
+            and close < values["cpr_bottom"] and close < values["previous_close"])
 
 
 def calculate_trigger_price(

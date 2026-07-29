@@ -35,7 +35,7 @@ LOCK_TIME = time(9, 45)
 
 
 st.set_page_config(
-    page_title="SMART F&O ENGINE V8",
+    page_title="SMART F&O ENGINE V9",
     layout="wide",
 )
 
@@ -46,7 +46,7 @@ st.set_page_config(
 header_left, header_right = st.columns([6, 1])
 
 with header_left:
-    st.title("SMART F&O ENGINE V8.1")
+    st.title("SMART F&O ENGINE V9.0")
 
 with header_right:
     st.markdown("<br>", unsafe_allow_html=True)
@@ -55,7 +55,7 @@ with header_right:
         st.rerun()
 
 st.caption(
-    f"Build: V8.1-CPR | Indian Time: "
+    f"Build: V9.0-EXECUTION-FIX | Indian Time: "
     f"{datetime.now(IST).strftime('%d-%m-%Y %H:%M:%S')} | "
     "Auto Refresh: 30 Seconds"
 )
@@ -195,7 +195,9 @@ def save_backtest_snapshot(dataframe):
         "SL",
         "Target 1",
         "Target 2",
+        "Exit Price",
         "Triggered At",
+        "Completed At",
         "Last Updated",
     ]
 
@@ -344,6 +346,7 @@ numeric_columns = [
     "SL",
     "Target 1",
     "Target 2",
+    "Exit Price",
     "Progress %",
 ]
 
@@ -378,7 +381,7 @@ active_count = int(
 
 completed_count = int(
     status_series.isin(
-        ["TARGET 2 HIT", "STOP LOSS HIT"]
+        ["TARGET 2 HIT", "STOP LOSS HIT", "FORCE EXIT", "EXPIRED"]
     ).sum()
 )
 
@@ -441,6 +444,7 @@ trade_statuses = [
     "TARGET 1 HIT",
     "TARGET 2 HIT",
     "STOP LOSS HIT",
+    "FORCE EXIT",
 ]
 
 if "Status" in display_dataframe.columns:
@@ -462,8 +466,10 @@ if not trade_dataframe.empty:
         "SL",
         "Target 1",
         "Target 2",
+        "Exit Price",
         "Progress %",
         "Triggered At",
+        "Completed At",
         "Last Updated",
     ]
 

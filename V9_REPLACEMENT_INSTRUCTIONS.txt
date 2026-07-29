@@ -1,0 +1,24 @@
+SMART F&O ENGINE V9.0 — REPLACEMENT INSTRUCTIONS
+
+1. Back up your current GitHub project.
+2. Replace app.py and the complete scanner folder with the files in this ZIP.
+3. Replace execution_state.json with the clean file supplied here.
+4. Keep your own data/fno_stocks.csv and locked_top2.csv only when they are for today's session.
+5. Delete locked_top2.csv before the next trading day if the hosting platform does not rotate it automatically.
+6. Push the changes and confirm the dashboard header displays:
+   SMART F&O ENGINE V9.0
+   Build: V9.0-EXECUTION-FIX
+7. Use paper trading. Do not use live money until at least 30 technically clean forward-test trades are recorded.
+
+KEY CORRECTIONS
+- Immediate live-CMP stop-loss and target detection.
+- Completed trade states cannot revert to ACTIVE.
+- Completed-candle replay includes the trigger candle conservatively.
+- Two-candle trigger expiry and 13:45 last-entry cut-off.
+- 15:15 force exit.
+- Structure-aware ATR risk with maximum 1% price risk.
+- Target 1 moves the remaining position to breakeven.
+- Current-session validation prevents execution on stale historical data.
+
+IMPORTANT
+No code or indicator can guarantee 80% accuracy. V9 fixes execution correctness and makes entries more selective. Profitability must be established by forward testing after costs.

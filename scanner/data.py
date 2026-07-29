@@ -463,6 +463,8 @@ def prepare_features(symbol: str) -> Optional[dict]:
         "vwap": vwap,
         "atr": atr,
         "rolv": rolv,
+        "ema20_slope": float(completed_data["EMA20"].iloc[-1] - completed_data["EMA20"].iloc[-4]) if len(completed_data) >= 4 else 0.0,
+        "ema50_slope": float(completed_data["EMA50"].iloc[-1] - completed_data["EMA50"].iloc[-4]) if len(completed_data) >= 4 else 0.0,
 
         # Central Pivot Range calculated from the previous session.
         # These fields are used internally and are not displayed.
@@ -490,6 +492,7 @@ def prepare_features(symbol: str) -> Optional[dict]:
                 "high": round(float(row["High"]), 2),
                 "low": round(float(row["Low"]), 2),
                 "close": round(float(row["Close"]), 2),
+                "volume": int(row["Volume"]),
             }
             for index, row in session_data.iterrows()
         ],
