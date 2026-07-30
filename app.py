@@ -9,6 +9,12 @@ import streamlit.components.v1 as components
 from scanner.engine import scan_market
 from scanner.execution import monitor_watchlist
 from scanner.universe import load_universe
+from scanner.storage import (
+    connection_status,
+    load_payload,
+    save_payload,
+    watchlist_key,
+)
 
 
 # ==========================
@@ -35,7 +41,7 @@ LOCK_TIME = time(9, 45)
 
 
 st.set_page_config(
-    page_title="SMART F&O ENGINE V9",
+    page_title="SMART F&O ENGINE V9.2",
     layout="wide",
 )
 
@@ -46,7 +52,7 @@ st.set_page_config(
 header_left, header_right = st.columns([6, 1])
 
 with header_left:
-    st.title("SMART F&O ENGINE V9.0")
+    st.title("SMART F&O ENGINE V9.2")
 
 with header_right:
     st.markdown("<br>", unsafe_allow_html=True)
@@ -55,10 +61,16 @@ with header_right:
         st.rerun()
 
 st.caption(
-    f"Build: V9.0-EXECUTION-FIX | Indian Time: "
+    f"Build: V9.2-SUPABASE-PERSISTENCE | Indian Time: "
     f"{datetime.now(IST).strftime('%d-%m-%Y %H:%M:%S')} | "
     "Auto Refresh: 30 Seconds"
 )
+
+storage_ok, storage_message = connection_status()
+if storage_ok:
+    st.success("Persistent storage: connected")
+else:
+    st.error(f"Persistent storage unavailable: {storage_message}")
 
 components.html(
     """
@@ -102,71 +114,69 @@ def now_str():
 # WATCHLIST STORAGE
 # ==========================
 
-def load_locked_top2():
-    """Load today's locked Top 2 watchlist."""
-
+def _load_local_locked_top2():
+    """Load today's local CSV backup."""
     if not os.path.exists(LOCK_FILE):
         return None
-
     try:
         dataframe = pd.read_csv(LOCK_FILE)
-
         if dataframe.empty or "date" not in dataframe.columns:
             return None
-
         dataframe["date"] = pd.to_datetime(
-            dataframe["date"],
-            format="%d-%m-%Y",
-            errors="coerce",
+            dataframe["date"], format="%d-%m-%Y", errors="coerce"
         ).dt.date
-
-        today_dataframe = dataframe[
-            dataframe["date"] == today_date()
-        ].copy()
-
+        today_dataframe = dataframe[dataframe["date"] == today_date()].copy()
         if today_dataframe.empty:
             return None
-
-        today_dataframe.drop(
-            columns=["date"],
-            inplace=True,
-        )
-
+        today_dataframe.drop(columns=["date"], inplace=True)
         return today_dataframe
-
     except Exception as exc:
-        st.error(
-            f"Watchlist lock file error: {exc}"
-        )
+        st.warning(f"Local watchlist backup error: {exc}")
         return None
+
+
+def load_locked_top2():
+    """Load today's locked Top 2 from Supabase, then local backup."""
+    reachable, payload, error_message = load_payload(watchlist_key())
+    if reachable and isinstance(payload, list) and payload:
+        dataframe = pd.DataFrame(payload)
+        if not dataframe.empty:
+            return dataframe, True
+
+    local_dataframe = _load_local_locked_top2()
+    if local_dataframe is not None:
+        if reachable:
+            save_payload(watchlist_key(), local_dataframe.to_dict(orient="records"))
+        return local_dataframe, reachable
+
+    if not reachable:
+        st.error(error_message or "Supabase could not be reached.")
+    return None, reachable
 
 
 def save_locked_top2(results):
-    """Save today's Top 2 watchlist."""
-
+    """Save today's Top 2 in Supabase and a local CSV backup."""
     dataframe = pd.DataFrame(results)
-
     if dataframe.empty:
         return False
 
-    dataframe.insert(
-        0,
-        "date",
-        today_str(),
+    remote_saved, remote_error = save_payload(
+        watchlist_key(), dataframe.to_dict(orient="records")
     )
 
+    local_dataframe = dataframe.copy()
+    local_dataframe.insert(0, "date", today_str())
+    local_saved = False
     try:
-        dataframe.to_csv(
-            LOCK_FILE,
-            index=False,
-        )
-        return True
-
+        local_dataframe.to_csv(LOCK_FILE, index=False)
+        local_saved = True
     except Exception as exc:
-        st.error(
-            f"Unable to save watchlist: {exc}"
-        )
+        st.warning(f"Local watchlist backup could not be saved: {exc}")
+
+    if not remote_saved:
+        st.error(remote_error or "Supabase watchlist save failed.")
         return False
+    return remote_saved
 
 
 # ==========================
@@ -265,39 +275,38 @@ def cached_scan():
 # MAIN WORKFLOW
 # ==========================
 
-locked_dataframe = load_locked_top2()
+locked_dataframe, remote_reachable = load_locked_top2()
 is_locked = locked_dataframe is not None
+current_time = datetime.now(IST).time()
 
 if is_locked:
     watchlist_dataframe = locked_dataframe.copy()
-
-
 else:
-    results = cached_scan()
-
-    if not results:
-        st.warning(
-            "No high-quality watchlist candidate found."
+    # Fail safe: after lock time, never rescan when persistent storage is unavailable.
+    if current_time >= LOCK_TIME and not remote_reachable:
+        st.error(
+            "Today's locked watchlist could not be restored because persistent "
+            "storage is unavailable. Execution is paused; no rescan was permitted."
         )
         st.stop()
 
-    current_time = datetime.now(IST).time()
-    watchlist_dataframe = pd.DataFrame(results)
+    results = cached_scan()
+    if not results:
+        st.warning("No high-quality watchlist candidate found.")
+        st.stop()
 
+    watchlist_dataframe = pd.DataFrame(results)
     if current_time >= LOCK_TIME:
         saved = save_locked_top2(results)
-
         if saved:
             is_locked = True
-            st.success(
-                "Today's Top 2 watchlist locked successfully."
-            )
+            st.success("Today's Top 2 watchlist locked and saved permanently.")
         else:
             st.error(
-                "The watchlist could not be locked. "
+                "The watchlist could not be saved to Supabase. "
                 "Execution monitoring has not started."
             )
-
+            st.stop()
     else:
         st.warning(
             "Observation mode before 09:45 AM IST. "
