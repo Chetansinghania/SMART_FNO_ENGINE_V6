@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from scanner.data import prepare_features
 from scanner.entry import calculate_trigger_price, validate_direction
 from scanner.risk import calculate_trade_levels
+from scanner.storage import execution_key, load_payload, save_payload
 
 IST = ZoneInfo("Asia/Kolkata")
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,10 +44,10 @@ def _to_float(value: Any) -> Optional[float]:
 
 
 def _default_state() -> dict:
-    return {"date": _today_str(), "version": "V9.0", "stocks": {}}
+    return {"date": _today_str(), "version": "V9.2", "stocks": {}}
 
 
-def load_execution_state() -> dict:
+def _load_local_execution_state() -> dict:
     if not os.path.exists(STATE_FILE):
         return _default_state()
     try:
@@ -58,20 +59,39 @@ def load_execution_state() -> dict:
         return _default_state()
     if not isinstance(state.get("stocks"), dict):
         state["stocks"] = {}
-    state["version"] = "V9.0"
+    state["version"] = "V9.2"
     return state
 
 
+def load_execution_state() -> dict:
+    reachable, payload, error_message = load_payload(execution_key())
+    if reachable and isinstance(payload, dict) and payload.get("date") == _today_str():
+        if not isinstance(payload.get("stocks"), dict):
+            payload["stocks"] = {}
+        payload["version"] = "V9.2"
+        return payload
+
+    local_state = _load_local_execution_state()
+    if not reachable:
+        print(error_message or "Supabase execution-state read unavailable; local backup used.")
+    return local_state
+
+
 def save_execution_state(state: dict) -> bool:
+    local_saved = False
     try:
         temporary_file = f"{STATE_FILE}.tmp"
         with open(temporary_file, "w", encoding="utf-8") as file:
             json.dump(state, file, indent=2, default=str)
         os.replace(temporary_file, STATE_FILE)
-        return True
+        local_saved = True
     except OSError as exc:
-        print(f"Execution state save error: {exc}")
-        return False
+        print(f"Execution state local-save error: {exc}")
+
+    remote_saved, error_message = save_payload(execution_key(), state)
+    if not remote_saved:
+        print(error_message or "Supabase execution-state save failed.")
+    return remote_saved or local_saved
 
 
 def reset_execution_state() -> bool:
